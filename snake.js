@@ -1,6 +1,6 @@
 const gameArea = document.getElementById('gameArea');
-const gridSize = 40; // Размер клетки
-const gameSize = 400; // Размер поля
+const gridSize = 40;
+const gameSize = 640; // ← Исправлено! Теперь соответствует CSS (650px - borders)
 let snake = [{ x: 200, y: 200 }];
 let direction = { x: 0, y: 0 };
 let food = spawnFood();
@@ -8,18 +8,16 @@ let speed = 200;
 let score = 0;
 const scoreEl = document.getElementById('score');
 
-// Управление стрелками
 let introHidden = false;
 
+// ← Убрал дублирование! Только одна привязка событий
 document.addEventListener('keydown', (e) => {
     if (!introHidden && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         document.getElementById('introScreen').style.display = 'none';
         introHidden = true;
     }
-
     changeDirection(e);
 });
-document.addEventListener('keydown', changeDirection);
 
 function changeDirection(e) {
     switch (e.key) {
@@ -39,15 +37,20 @@ function changeDirection(e) {
 }
 
 function spawnFood() {
-    return {
-        x: Math.floor(Math.random() * (gameSize / gridSize)) * gridSize,
-        y: Math.floor(Math.random() * (gameSize / gridSize)) * gridSize
-    };
+    let newFood;
+    do {
+        newFood = {
+            x: Math.floor(Math.random() * (gameSize / gridSize)) * gridSize,
+            y: Math.floor(Math.random() * (gameSize / gridSize)) * gridSize
+        };
+    } while (snake.some(part => part.x === newFood.x && part.y === newFood.y)); // ← Проверка на столкновение с змейкой
+    
+    return newFood;
 }
 
 function draw() {
-    gameArea.innerHTML = ''; // Очищаем поле
-
+    gameArea.innerHTML = '';
+    
     // Отрисовка змейки
     snake.forEach(part => {
         const segment = document.createElement('div');
@@ -56,7 +59,7 @@ function draw() {
         segment.style.top = part.y + 'px';
         gameArea.appendChild(segment);
     });
-
+    
     // Отрисовка еды
     const foodEl = document.createElement('div');
     foodEl.classList.add('food');
@@ -66,46 +69,44 @@ function draw() {
 }
 
 function update() {
-    // ⛔ Если направление не выбрано — ничего не делаем
     if (direction.x === 0 && direction.y === 0) {
         return;
     }
-
+    
     const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-
+    
     // Столкновение со стеной
-    if (
-        head.x < 0 || head.x >= gameSize ||
-        head.y < 0 || head.y >= gameSize
-    ) {
-        alert('Game is over!');
+    if (head.x < 0 || head.x >= gameSize || head.y < 0 || head.y >= gameSize) {
+        alert('Game Over!');
         resetGame();
         return;
     }
-
+    
     // Столкновение с собой
-    if (snake.slice(1).some(part => part.x === head.x && part.y === head.y)) {
-        alert('Game is over');
+    if (snake.some(part => part.x === head.x && part.y === head.y)) {
+        alert('Game Over!');
         resetGame();
         return;
     }
-
-    // Добавляем новую голову
+    
     snake.unshift(head);
-
+    
     // Проверка на еду
     if (head.x === food.x && head.y === food.y) {
         food = spawnFood();
-    
-        // Увеличиваем счёт
         score++;
         scoreEl.textContent = score;
-    
-        // Не удаляем хвост — змейка станет длиннее на 1
+        
+        // ← Добавлена проверка скорости игры
+        if (speed > 100) {
+            speed -= 5; // Ускоряемся по мере роста
+            clearInterval(gameInterval);
+            gameInterval = setInterval(update, speed);
+        }
     } else {
-        // Удаляем хвост — обычное движение
         snake.pop();
     }
+    
     draw();
 }
 
@@ -114,8 +115,18 @@ function resetGame() {
     direction = { x: 0, y: 0 };
     food = spawnFood();
     score = 0;
+    speed = 200;
     scoreEl.textContent = score;
+    
+    // ← Сброс интервала
+    clearInterval(gameInterval);
+    gameInterval = setInterval(update, speed);
+    
     draw();
 }
 
-setInterval(update, speed);
+// ← Сохраняем ссылку на интервал для корректного управления
+let gameInterval = setInterval(update, speed);
+
+// Первоначальная отрисовка
+draw();
